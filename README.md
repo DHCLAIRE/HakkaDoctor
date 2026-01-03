@@ -1,6 +1,7 @@
 # Hakka Doctor 客醫講 (Ongoing)
 
 旨在降低使用客家話於醫療溝通上的門檻，並增進偏遠地區醫療資源的可取得性。
+
 A designed platform to lower the barrier for people to communicate in Hakka about their health conditions. And to improve the resource accessibility in remote area. 
 
 
