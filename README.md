@@ -40,6 +40,14 @@ pip install -r requirements.txt
 
 ### Quick Start
 
+#### Mandarin-Hakka Medical Interpreter
+
+```bash
+python HakkaDoctor_app.py
+```
+
+The Gradio app supports Mandarin doctor text/audio to Hakka patient instructions and Hakka patient text/audio to Mandarin clinical meaning. Text interpretation works without loading ASR/TTS models; audio and speech synthesis load models lazily when those buttons are used.
+
 #### Accent Evaluation
 
 ```python
@@ -102,5 +110,4 @@ The accent evaluator reports calculation metadata in `calculation_references` so
 * Yuan, W., & Black, A. W. (2018). Generating Mandarin and Cantonese F0 Contours with Decision Trees and BLSTMs. Useful for F0 contour representations and tone-dependent modeling.
 * Wang, T., Potter, C. E., & Saffran, J. R. (2020). Plasticity in Second Language Learning: The Case of Mandarin Tones. *Language Learning and Development*, 16(3), 231-243. https://doi.org/10.1080/15475441.2020.1737072
 * Dong, Y. Difficulties in Perception and Pronunciation of Mandarin Chinese Disyllabic Word Tone Acquisition. Useful for disyllabic tone-combination error patterns.
-
 
