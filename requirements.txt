@@ -2,6 +2,7 @@ accelerate
 librosa
 numpy
 praat-parselmouth
+pytest
 scipy
 soundfile
 torch
