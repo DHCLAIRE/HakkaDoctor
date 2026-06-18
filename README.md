@@ -48,6 +48,32 @@ python HakkaDoctor_app.py
 
 The Gradio app supports Mandarin doctor text/audio to Hakka patient instructions and Hakka patient text/audio to Mandarin clinical meaning. Text interpretation works without loading ASR/TTS models; audio and speech synthesis load models lazily when those buttons are used.
 
+#### Small-Data Hakka Parser
+
+```python
+from hakka_speech_toolkit import HakkaRuleParser
+
+parser = HakkaRuleParser()
+result = parser.parse("𠊎毋食藥。")
+print(result["result_segmentation"])
+print(result["result_pos"])
+```
+
+The parser follows the low-resource, Articut-style approach: layered POS dictionaries, forward maximum matching, user-defined dictionary injection, post-token POS shift rules, and OOV heuristics. It accepts Articut-shaped user dictionaries:
+
+```python
+from hakka_speech_toolkit.parser import build_user_defined_dict
+
+build_user_defined_dict(
+    [("血氧", "ENTITY_noun"), ("量", "ACTION_verb")],
+    "hakka_rules.json",
+)
+
+result = parser.parse("請量血氧", userDefinedDictFILE="hakka_rules.json")
+```
+
+Returned fields include `result_segmentation`, `result_pos`, `result_obj`, `tokens`, `sentence_patterns`, and `rules_applied`, so the output can be used in downstream clinical interpretation or annotation workflows.
+
 #### Accent Evaluation
 
 ```python
@@ -110,4 +136,3 @@ The accent evaluator reports calculation metadata in `calculation_references` so
 * Yuan, W., & Black, A. W. (2018). Generating Mandarin and Cantonese F0 Contours with Decision Trees and BLSTMs. Useful for F0 contour representations and tone-dependent modeling.
 * Wang, T., Potter, C. E., & Saffran, J. R. (2020). Plasticity in Second Language Learning: The Case of Mandarin Tones. *Language Learning and Development*, 16(3), 231-243. https://doi.org/10.1080/15475441.2020.1737072
 * Dong, Y. Difficulties in Perception and Pronunciation of Mandarin Chinese Disyllabic Word Tone Acquisition. Useful for disyllabic tone-combination error patterns.
-
