@@ -1,0 +1,9 @@
+accelerate
+librosa
+numpy
+praat-parselmouth
+scipy
+soundfile
+torch
+torchaudio
+transformers
