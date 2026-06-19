@@ -10,6 +10,8 @@ from hakka_speech_toolkit.parser_rules import apply_pos_shift_rules
 
 
 def test_parser_segments_and_tags_known_hakka_sentence():
+    """Verify the parser tags a basic negated medication sentence."""
+
     parser = HakkaRuleParser()
 
     result = parser.parse("𠊎毋食藥。")
@@ -23,6 +25,8 @@ def test_parser_segments_and_tags_known_hakka_sentence():
 
 
 def test_user_defined_dict_overrides_oov_and_uses_articut_shape(tmp_path):
+    """Verify user dictionaries override OOV behavior and keep Articut-like output."""
+
     dict_path = tmp_path / "hakka_rules.json"
     build_user_defined_dict([("血氧", "ENTITY_noun"), ("量", "ACTION_verb")], dict_path)
     parser = ArticutLikeHakkaParser()
@@ -35,6 +39,8 @@ def test_user_defined_dict_overrides_oov_and_uses_articut_shape(tmp_path):
 
 
 def test_simple_word_to_pos_dictionary_is_supported():
+    """Verify simple word-to-POS dictionaries normalize correctly."""
+
     normalized = normalize_user_defined_dict({"當靚": "MODIFIER", "𠊎": "ENTITY_pronoun"})
 
     assert normalized["MODIFIER"] == ["當靚"]
@@ -42,6 +48,8 @@ def test_simple_word_to_pos_dictionary_is_supported():
 
 
 def test_pos_shift_marks_unknown_after_modal_as_verb():
+    """Verify OOV material after a modal is parsed as a predicate verb."""
+
     parser = HakkaRuleParser()
 
     result = parser.parse("佢愛測血糖")
@@ -54,6 +62,8 @@ def test_pos_shift_marks_unknown_after_modal_as_verb():
 
 
 def test_possessive_particle_rule():
+    """Verify Hakka possessive particles create possessive structures."""
+
     parser = HakkaRuleParser()
 
     result = parser.parse("𠊎介藥")
@@ -65,6 +75,8 @@ def test_possessive_particle_rule():
 
 
 def test_parser_returns_xbar_and_ud_annotation_metadata():
+    """Verify parser output includes X-bar and UD-compatible metadata."""
+
     result = HakkaRuleParser().parse("佢愛測血糖")
 
     assert result["annotation_framework"]["framework"] == "UD-compatible dependencies plus X-bar phrase projections."
@@ -73,6 +85,8 @@ def test_parser_returns_xbar_and_ud_annotation_metadata():
 
 
 def test_regex_pos_shift_repairs_articut_style_xml():
+    """Verify regex POS-shift repairs Articut-style XML fragments."""
+
     shifted, applied = apply_pos_shift_rules(
         "<ENTITY_pronoun>𠊎</ENTITY_pronoun>"
         "<FUNC_inner>个</FUNC_inner>"

@@ -11,3 +11,5 @@ torchaudio
 transformers
 # Optional Hakka parser backend:
 # ArticutAPI_Hakka must be installed separately from Droidtown's repository.
+# Optional full HHT/HHSA backend:
+# python3 -m pip install git+https://github.com/DHCLAIRE/HHSA-Py.git

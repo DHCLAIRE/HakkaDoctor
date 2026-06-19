@@ -142,6 +142,8 @@ class ParseToken:
     source: str = "default"
 
     def to_obj(self) -> Dict[str, Any]:
+        """Return this token as a JSON-ready object."""
+
         return {
             "text": self.text,
             "pos": self.pos,
@@ -151,6 +153,8 @@ class ParseToken:
         }
 
     def to_pos_xml(self) -> str:
+        """Render this token as Articut-style POS XML."""
+
         if self.pos == "PUNCTUATION":
             return self.text
         return "<{0}>{1}</{0}>".format(self.pos, self.text)
@@ -164,6 +168,8 @@ class HakkaRuleParser:
         user_defined_dict: Optional[Dict[str, Any]] = None,
         max_oov_group: int = 4,
     ) -> None:
+        """Initialize the offline parser with an optional user dictionary."""
+
         self.max_oov_group = max_oov_group
         self.lexicon = self._build_lexicon(user_defined_dict or {})
         from .parser_grammar import HakkaXBarGrammar
@@ -172,6 +178,8 @@ class HakkaRuleParser:
 
     @classmethod
     def from_user_defined_file(cls, user_defined_dict_file: str | Path) -> "HakkaRuleParser":
+        """Create a parser from an Articut-style user-defined dictionary file."""
+
         return cls(load_user_defined_dict(user_defined_dict_file))
 
     def parse(
@@ -244,6 +252,8 @@ class HakkaRuleParser:
         user_defined_dict: Dict[str, Any],
         base: Optional[Dict[str, Dict[str, str]]] = None,
     ) -> Dict[str, Dict[str, str]]:
+        """Merge the seed lexicon with user-defined POS entries."""
+
         lexicon = {pos: dict(words) for pos, words in (base or {}).items()}
         if not lexicon:
             for pos, words in DEFAULT_LEXICON.items():
@@ -262,6 +272,8 @@ class HakkaRuleParser:
         return lexicon
 
     def _tokenize(self, text: str, lexicon: Dict[str, Dict[str, str]]) -> List[ParseToken]:
+        """Segment text with forward maximum matching and OOV safeguards."""
+
         words_by_length = sorted(
             ((word, pos, source) for pos, words in lexicon.items() for word, source in words.items()),
             key=lambda item: len(item[0]),
@@ -301,6 +313,8 @@ class HakkaRuleParser:
         index: int,
         words_by_length: Sequence[Tuple[str, str, str]],
     ) -> Optional[ParseToken]:
+        """Find the longest dictionary token beginning at an index."""
+
         for word, pos, source in words_by_length:
             if text.startswith(word, index):
                 return ParseToken(word, pos, index, index + len(word), source)
@@ -312,6 +326,8 @@ class HakkaRuleParser:
         index: int,
         words_by_length: Sequence[Tuple[str, str, str]],
     ) -> int:
+        """Find the end of an OOV span without swallowing the next known word."""
+
         end = index + 1
         while end < min(len(text), index + self.max_oov_group):
             if text[end] in PUNCTUATION:
@@ -326,6 +342,8 @@ class HakkaRuleParser:
         tokens: List[ParseToken],
         lexicon: Dict[str, Dict[str, str]],
     ) -> List[ParseToken]:
+        """Split OOV spans when they contain known grammatical characters."""
+
         known_chars = {
             word
             for pos in ("ENTITY_pronoun", "FUNC_negation", "ENTITY_possessive", "CLAUSE_Q")
@@ -359,12 +377,16 @@ class HakkaRuleParser:
 
     @staticmethod
     def _single_char_token(char: str, index: int, lexicon: Dict[str, Dict[str, str]]) -> ParseToken:
+        """Tag a known single-character function token or return OOV."""
+
         for pos in ("ENTITY_pronoun", "FUNC_negation", "ENTITY_possessive", "CLAUSE_Q"):
             if char in lexicon.get(pos, {}):
                 return ParseToken(char, pos, index, index + 1, lexicon[pos][char])
         return ParseToken(char, "ENTITY_oov", index, index + 1, "oov")
 
     def _apply_context_heuristics(self, tokens: List[ParseToken]) -> Tuple[List[ParseToken], List[str]]:
+        """Apply local token-context retagging before regex POS-shift rules."""
+
         shifted = list(tokens)
         rules_applied: List[str] = []
 
@@ -400,6 +422,8 @@ class HakkaRuleParser:
 
     @staticmethod
     def _tokens_from_pos_xml(pos_xml: str, fallback_tokens: Sequence[ParseToken]) -> List[ParseToken]:
+        """Rebuild tokens after POS XML rewrites while preserving approximate spans."""
+
         parsed = [
             ParseToken(match.group("text"), match.group("pos"), 0, 0, "pos_shift")
             for match in re.finditer(r"<(?P<pos>[^>]+)>(?P<text>[^<]+)</(?P=pos)>", pos_xml)
@@ -426,10 +450,14 @@ class HakkaRuleParser:
 
     @staticmethod
     def _replace_pos(token: ParseToken, pos: str) -> ParseToken:
+        """Return a copy of a token with a different POS tag."""
+
         return ParseToken(token.text, pos, token.start, token.end, token.source)
 
     @staticmethod
     def _previous_content_token(tokens: Sequence[ParseToken], index: int) -> Optional[ParseToken]:
+        """Return the previous non-punctuation token before an index."""
+
         for cursor in range(index - 1, -1, -1):
             if tokens[cursor].pos != "PUNCTUATION":
                 return tokens[cursor]
@@ -437,12 +465,16 @@ class HakkaRuleParser:
 
     @staticmethod
     def _next_content_token(tokens: Sequence[ParseToken], index: int) -> Optional[ParseToken]:
+        """Return the next non-punctuation token after an index."""
+
         for cursor in range(index + 1, len(tokens)):
             if tokens[cursor].pos != "PUNCTUATION":
                 return tokens[cursor]
         return None
 
     def _infer_sentence_spans(self, tokens: Sequence[ParseToken]) -> List[Dict[str, Any]]:
+        """Infer lightweight predicate spans for downstream inspection."""
+
         patterns = []
         content = [token for token in tokens if token.pos != "PUNCTUATION"]
         for index, token in enumerate(content):
@@ -470,6 +502,8 @@ class HakkaRuleParser:
         pos_set: set,
         max_distance: int = 6,
     ) -> Optional[ParseToken]:
+        """Find the nearest matching token to the left within a distance window."""
+
         for distance, cursor in enumerate(range(index - 1, -1, -1), start=1):
             if distance > max_distance:
                 break
@@ -484,6 +518,8 @@ class HakkaRuleParser:
         pos_set: set,
         max_distance: int = 6,
     ) -> Optional[ParseToken]:
+        """Find the nearest matching token to the right within a distance window."""
+
         for distance, cursor in enumerate(range(index + 1, len(tokens)), start=1):
             if distance > max_distance:
                 break
@@ -515,6 +551,8 @@ def normalize_user_defined_dict(user_defined_dict: Dict[str, Any]) -> Dict[str, 
 
 
 def load_user_defined_dict(path: str | Path) -> Dict[str, Any]:
+    """Load an Articut-style user-defined dictionary JSON file."""
+
     with Path(path).expanduser().open("r", encoding="utf-8") as file:
         return json.load(file)
 

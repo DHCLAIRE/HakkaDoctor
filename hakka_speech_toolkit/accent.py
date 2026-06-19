@@ -48,6 +48,32 @@ ACCENT_TOOL_REFERENCES = [
         "supports": "Combining segmental/prosodic acoustic measures for pronunciation assessment.",
         "doi": "10.48550/arXiv.2310.13974",
     },
+    {
+        "key": "davis_mermelstein_1980_mfcc",
+        "citation": (
+            "Davis, S., & Mermelstein, P. (1980). Comparison of parametric "
+            "representations for monosyllabic word recognition in continuously spoken sentences."
+        ),
+        "supports": "MFCC baseline features for speech representation.",
+        "doi": "10.1109/TASSP.1980.1163420",
+    },
+    {
+        "key": "huang_1998_hht",
+        "citation": (
+            "Huang, N. E., et al. (1998). The empirical mode decomposition and "
+            "the Hilbert spectrum for nonlinear and non-stationary time series analysis."
+        ),
+        "supports": "HHT/EMD signal dissection into IMFs and Hilbert instantaneous features.",
+        "doi": "10.1098/rspa.1998.0193",
+    },
+    {
+        "key": "walsh_2022_hht_accent",
+        "citation": (
+            "Walsh, D., Dev, S., & Nag, A. (2022). Hilbert-Huang-Transform "
+            "Based Features for Accent Classification of Non-Native English Speakers."
+        ),
+        "supports": "HHT-derived Hilbert Mel-Spectrogram features for accent classification.",
+    },
 ]
 
 
@@ -61,6 +87,8 @@ class AccentEvaluator:
         pitch_ceiling: float = 600.0,
         max_formant: float = 5500.0,
     ) -> None:
+        """Configure Praat pitch/formant extraction parameters."""
+
         self.time_step = time_step
         self.pitch_floor = pitch_floor
         self.pitch_ceiling = pitch_ceiling
@@ -68,6 +96,8 @@ class AccentEvaluator:
 
     @staticmethod
     def _require_file(audio_path: str | Path) -> Path:
+        """Validate and return an existing audio file path."""
+
         path = Path(audio_path).expanduser()
         if not path.exists():
             raise FileNotFoundError(f"Audio file not found: {path}")
@@ -76,11 +106,15 @@ class AccentEvaluator:
         return path
 
     def _load_sound(self, audio_path: str | Path) -> Any:
+        """Load an audio file as a parselmouth Sound object."""
+
         import parselmouth
 
         return parselmouth.Sound(str(self._require_file(audio_path)))
 
     def _pitch_contour(self, audio_path: str | Path) -> np.ndarray:
+        """Extract the cleaned voiced F0 contour from an audio file."""
+
         sound = self._load_sound(audio_path)
         pitch = sound.to_pitch(
             time_step=self.time_step,
@@ -91,7 +125,7 @@ class AccentEvaluator:
         return self._clean_f0(f0)
 
     def extract_features(self, audio_path: str | Path) -> dict[str, Any]:
-        """Return mean F0, F1, F2, and contour metadata in JSON-ready form."""
+        """Return F0, F1/F2, MFCC, and HHT metadata in JSON-ready form."""
 
         sound = self._load_sound(audio_path)
         pitch = sound.to_pitch(
@@ -117,6 +151,7 @@ class AccentEvaluator:
                 f1_values.append(float(f1))
             if np.isfinite(f2):
                 f2_values.append(float(f2))
+        waveform, sample_rate = self._sound_to_mono(sound)
 
         return {
             "audio_path": str(Path(audio_path).expanduser()),
@@ -133,8 +168,197 @@ class AccentEvaluator:
                 "mean_f1_hz": float(np.mean(f1_values)) if f1_values else None,
                 "mean_f2_hz": float(np.mean(f2_values)) if f2_values else None,
             },
+            "mfcc": self.extract_mfcc_features(waveform, sample_rate),
+            "hht": self.extract_hht_features(waveform, sample_rate),
             "calculation_references": ACCENT_TOOL_REFERENCES,
         }
+
+    @staticmethod
+    def _sound_to_mono(sound: Any) -> tuple[np.ndarray, float]:
+        """Convert a parselmouth Sound into mono samples and sampling rate."""
+
+        values = np.asarray(sound.values, dtype=float)
+        if values.ndim == 2:
+            waveform = np.mean(values, axis=0)
+        else:
+            waveform = values.reshape(-1)
+        sample_rate = float(getattr(sound, "sampling_frequency", 1.0 / sound.dx))
+        return waveform, sample_rate
+
+    @classmethod
+    def extract_mfcc_features(
+        cls,
+        waveform: np.ndarray,
+        sample_rate: float,
+        n_mfcc: int = 13,
+    ) -> dict[str, Any]:
+        """Extract MFCC coefficient summaries from a waveform."""
+
+        y = cls._prepare_waveform(waveform)
+        if y.size == 0:
+            return {"n_mfcc": n_mfcc, "backend": "librosa", "available": False, "reason": "empty waveform"}
+        try:
+            import librosa
+
+            mfcc = librosa.feature.mfcc(y=y, sr=int(sample_rate), n_mfcc=n_mfcc)
+            delta = librosa.feature.delta(mfcc)
+            delta2 = librosa.feature.delta(mfcc, order=2)
+        except Exception as error:
+            return {
+                "n_mfcc": n_mfcc,
+                "backend": "librosa",
+                "available": False,
+                "reason": str(error),
+            }
+        return {
+            "n_mfcc": n_mfcc,
+            "backend": "librosa",
+            "available": True,
+            "coefficients": cls._summarize_feature_matrix(mfcc, prefix="mfcc"),
+            "delta": cls._summarize_feature_matrix(delta, prefix="delta"),
+            "delta_delta": cls._summarize_feature_matrix(delta2, prefix="delta_delta"),
+        }
+
+    @classmethod
+    def extract_hht_features(
+        cls,
+        waveform: np.ndarray,
+        sample_rate: float,
+        max_imfs: int = 8,
+    ) -> dict[str, Any]:
+        """Extract HHT/HHSA signal-dissection summaries from a waveform."""
+
+        y = cls._prepare_waveform(waveform)
+        if y.size < 4:
+            return {"available": False, "backend": "hhsa_tools", "reason": "waveform too short"}
+        try:
+            from hhsa_tools import HHSAPipeline
+
+            pipeline = HHSAPipeline(
+                sample_rate=float(sample_rate),
+                decomposition="sift",
+                frequency_method="hybrid",
+                max_imfs=max_imfs,
+            )
+            result = pipeline.fit(y)
+            summary = pipeline.summarize(result)
+            return cls._summarize_hhsa_result(result, summary)
+        except Exception as error:
+            fallback = cls._extract_hilbert_fallback_features(y, sample_rate)
+            fallback["hhsa_tools_error"] = str(error)
+            return fallback
+
+    @staticmethod
+    def _prepare_waveform(waveform: np.ndarray) -> np.ndarray:
+        """Return a finite, centered mono waveform vector."""
+
+        y = np.asarray(waveform, dtype=float).reshape(-1)
+        y = y[np.isfinite(y)]
+        if y.size == 0:
+            return y
+        y = y - float(np.mean(y))
+        peak = float(np.max(np.abs(y)))
+        if peak > 0.0:
+            y = y / peak
+        return y
+
+    @staticmethod
+    def _summarize_feature_matrix(matrix: np.ndarray, prefix: str) -> dict[str, Any]:
+        """Summarize a feature matrix by coefficient-wise mean and standard deviation."""
+
+        values = np.asarray(matrix, dtype=float)
+        if values.ndim == 1:
+            values = values.reshape(1, -1)
+        return {
+            f"{prefix}_shape": list(values.shape),
+            f"{prefix}_mean": [float(v) for v in np.mean(values, axis=1)],
+            f"{prefix}_std": [float(v) for v in np.std(values, axis=1)],
+        }
+
+    @classmethod
+    def _summarize_hhsa_result(cls, result: Any, summary: dict[str, Any]) -> dict[str, Any]:
+        """Summarize HHSA-Py outputs for accent-feature JSON."""
+
+        imfs = np.asarray(getattr(result, "imfs", np.empty((0, 0))), dtype=float)
+        hht = np.asarray(getattr(result, "hht", np.empty((0, 0))), dtype=float)
+        marginal = np.asarray(getattr(result, "marginal", np.empty(0)), dtype=float)
+        carrier_bins = np.asarray(getattr(result, "carrier_bins", np.empty(0)), dtype=float)
+        mode_energy = np.asarray(summary.get("mode_energy", []), dtype=float)
+        dominant_frequency = None
+        if marginal.size and carrier_bins.size:
+            dominant_frequency = float(carrier_bins[int(np.nanargmax(marginal))])
+        return {
+            "available": True,
+            "backend": "hhsa_tools.HHSAPipeline",
+            "imf_count": int(imfs.shape[0]) if imfs.ndim == 2 else 0,
+            "mode_energy": [float(v) for v in mode_energy],
+            "mode_energy_entropy": cls._normalized_entropy(mode_energy),
+            "reconstruction_error": float(summary.get("reconstruction_error", np.nan)),
+            "dominant_carrier_hz": dominant_frequency,
+            "hht_shape": list(hht.shape),
+            "hht_energy": float(np.nansum(hht)) if hht.size else 0.0,
+            "marginal_entropy": cls._normalized_entropy(marginal),
+        }
+
+    @classmethod
+    def _extract_hilbert_fallback_features(cls, waveform: np.ndarray, sample_rate: float) -> dict[str, Any]:
+        """Extract instantaneous amplitude/frequency summaries with a NumPy Hilbert fallback."""
+
+        try:
+            analytic = cls._analytic_signal(waveform)
+            amplitude = np.abs(analytic)
+            phase = np.unwrap(np.angle(analytic))
+            frequency = np.diff(phase) * float(sample_rate) / (2.0 * np.pi)
+            frequency = frequency[np.isfinite(frequency) & (frequency >= 0.0)]
+            return {
+                "available": True,
+                "backend": "numpy.fft.hilbert_fallback",
+                "imf_count": 1,
+                "mode_energy": [float(np.sum(np.square(waveform)))],
+                "mode_energy_entropy": 0.0,
+                "instantaneous_amplitude_mean": float(np.mean(amplitude)),
+                "instantaneous_amplitude_std": float(np.std(amplitude)),
+                "instantaneous_frequency_mean_hz": float(np.mean(frequency)) if frequency.size else None,
+                "instantaneous_frequency_std_hz": float(np.std(frequency)) if frequency.size else None,
+                "instantaneous_frequency_median_hz": float(np.median(frequency)) if frequency.size else None,
+                "note": "Fallback uses one analytic signal and does not perform EMD/IMF decomposition.",
+            }
+        except Exception as error:
+            return {
+                "available": False,
+                "backend": "numpy.fft.hilbert_fallback",
+                "reason": str(error),
+            }
+
+    @staticmethod
+    def _analytic_signal(waveform: np.ndarray) -> np.ndarray:
+        """Compute the analytic signal with the standard FFT Hilbert construction."""
+
+        x = np.asarray(waveform, dtype=float).reshape(-1)
+        n = x.size
+        spectrum = np.fft.fft(x)
+        multiplier = np.zeros(n)
+        if n % 2 == 0:
+            multiplier[0] = 1.0
+            multiplier[n // 2] = 1.0
+            multiplier[1 : n // 2] = 2.0
+        else:
+            multiplier[0] = 1.0
+            multiplier[1 : (n + 1) // 2] = 2.0
+        return np.fft.ifft(spectrum * multiplier)
+
+    @staticmethod
+    def _normalized_entropy(values: np.ndarray) -> float | None:
+        """Compute normalized Shannon entropy for non-negative feature vectors."""
+
+        array = np.asarray(values, dtype=float)
+        array = array[np.isfinite(array) & (array >= 0.0)]
+        total = float(np.sum(array))
+        if array.size == 0 or total == 0.0:
+            return None
+        probability = array / total
+        entropy = -float(np.sum(probability * np.log(probability + 1e-12)))
+        return float(entropy / np.log(array.size)) if array.size > 1 else 0.0
 
     def compute_acoustic_distance(
         self,
@@ -243,6 +467,8 @@ class AccentEvaluator:
         reference_shape: dict[str, float | int | None],
         target_shape: dict[str, float | int | None],
     ) -> dict[str, float]:
+        """Compute absolute distances between comparable tone-shape features."""
+
         comparable_keys = ("start_st", "end_st", "range_st", "slope_st_per_frame")
         distances = {}
         for key in comparable_keys:
@@ -264,6 +490,8 @@ class AccentEvaluator:
         target: np.ndarray,
         radius: int | None = None,
     ) -> tuple[float, int]:
+        """Compute DTW distance and path length between two numeric contours."""
+
         costs = np.abs(reference[:, None] - target[None, :])
         rows, cols = costs.shape
         accumulated = np.full((rows + 1, cols + 1), np.inf)

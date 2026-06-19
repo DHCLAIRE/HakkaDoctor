@@ -49,6 +49,8 @@ class ArticutHakkaParser:
         allow_fallback: bool = True,
         fallback_parser: Any | None = None,
     ) -> None:
+        """Create an Articut client or remember why fallback is needed."""
+
         self.allow_fallback = allow_fallback
         self.fallback_parser = fallback_parser
         self.client = articut_client
@@ -108,6 +110,8 @@ class ArticutHakkaParser:
 
     @staticmethod
     def _normalize_articut_result(result: Dict[str, Any], input_text: str) -> Dict[str, Any]:
+        """Attach backend metadata to a Droidtown ArticutAPI_Hakka result."""
+
         normalized = dict(result)
         normalized.setdefault("input", input_text)
         normalized["parser"] = "ArticutHakkaParser"
@@ -135,6 +139,8 @@ class HakkaParser:
         user_defined_dict: Optional[Dict[str, Any]] = None,
         **articut_kwargs: Any,
     ) -> None:
+        """Create a unified parser using Articut, offline rules, or auto fallback."""
+
         self.backend = backend
         if backend not in {"auto", "articut", "offline"}:
             raise ValueError("backend must be one of: auto, articut, offline")
@@ -152,6 +158,8 @@ class HakkaParser:
             self.user_defined_dict = user_defined_dict
 
     def parse(self, input_text: str, **kwargs: Any) -> Dict[str, Any]:
+        """Parse text through the configured backend."""
+
         if self.backend in {"auto", "articut"}:
             kwargs.setdefault("user_defined_dict", getattr(self, "user_defined_dict", None))
         return self.parser.parse(input_text, **kwargs)

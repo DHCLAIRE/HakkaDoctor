@@ -32,6 +32,8 @@ class HakkaAccentConverter(HakkaSpeechModel):
         conversion_decoder: AccentConversionDecoder | None = None,
         device: str | torch.device | None = None,
     ) -> None:
+        """Load HuBERT and store an optional downstream conversion decoder."""
+
         super().__init__(device=device)
 
         try:

@@ -51,6 +51,8 @@ class XBarNode:
     children: List["XBarNode"] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Return this phrase node as a JSON-ready tree dictionary."""
+
         result = {
             "label": self.label,
             "head": self.head,
@@ -71,6 +73,8 @@ class DependencyArc:
     rule: str
 
     def to_dict(self, tokens: Sequence["ParseToken"]) -> Dict[str, Any]:
+        """Return this dependency arc with readable token text."""
+
         return {
             "head": self.head,
             "head_text": "ROOT" if self.head == -1 else tokens[self.head].text,
@@ -89,6 +93,8 @@ class HakkaXBarGrammar:
     MODIFIER_POS = {"MODIFIER", "MODIFIER_color", "FUNC_degreeHead"}
 
     def analyze(self, tokens: Iterable["ParseToken"]) -> Dict[str, Any]:
+        """Build X-bar and dependency analyses from POS-tagged tokens."""
+
         content = [token for token in tokens if token.pos != "PUNCTUATION"]
         if not content:
             return {
@@ -120,6 +126,8 @@ class HakkaXBarGrammar:
 
     @classmethod
     def annotation_framework(cls) -> Dict[str, Any]:
+        """Describe the annotation conventions used by this grammar layer."""
+
         return {
             "recommended_gold_sample": "Hand-annotate 100-300 sentences before claiming syntactic coverage.",
             "framework": "UD-compatible dependencies plus X-bar phrase projections.",
@@ -144,6 +152,8 @@ class HakkaXBarGrammar:
         rules: List[str],
         dependencies: List[DependencyArc],
     ) -> XBarNode:
+        """Build a TP projection around the main verbal predicate."""
+
         predicate = tokens[predicate_index]
         dependencies.append(DependencyArc(-1, predicate_index, "root", "main_predicate_as_root"))
         rules.append("main_predicate_as_root")
@@ -185,6 +195,8 @@ class HakkaXBarGrammar:
         rules: List[str],
         dependencies: List[DependencyArc],
     ) -> XBarNode:
+        """Build an NP projection with possessors, classifiers, and modifiers."""
+
         head = tokens[head_index]
         children = []
         possessor = self._nearest_left_index(tokens, head_index, {"ENTITY_pronoun", "ENTITY_person"}, max_distance=2)
@@ -213,12 +225,16 @@ class HakkaXBarGrammar:
         return XBarNode("NP", head=head.text, role="argument", children=children)
 
     def _find_main_predicate(self, tokens: Sequence["ParseToken"]) -> Optional[int]:
+        """Return the first verbal predicate index, if one exists."""
+
         for index, token in enumerate(tokens):
             if token.pos in self.VERB_POS:
                 return index
         return None
 
     def _find_nominal_head(self, tokens: Sequence["ParseToken"]) -> int:
+        """Return the rightmost nominal head or the final token as fallback."""
+
         for index in range(len(tokens) - 1, -1, -1):
             if tokens[index].pos in self.NOUN_POS:
                 return index
@@ -229,6 +245,8 @@ class HakkaXBarGrammar:
         tokens: Sequence["ParseToken"],
         predicate_index: int,
     ) -> List[tuple[int, str]]:
+        """Collect negation, auxiliary, and modifier dependents before a predicate."""
+
         dependents = []
         for index in range(max(0, predicate_index - 3), predicate_index):
             pos = tokens[index].pos
@@ -241,6 +259,8 @@ class HakkaXBarGrammar:
         return dependents
 
     def _right_particles(self, tokens: Sequence["ParseToken"], predicate_index: int) -> List[int]:
+        """Collect clause-final particles and aspects after a predicate."""
+
         particles = []
         for index in range(predicate_index + 1, min(len(tokens), predicate_index + 4)):
             if tokens[index].pos in {"CLAUSE_Q", "CLAUSE_particle", "ASPECT"}:
@@ -249,6 +269,8 @@ class HakkaXBarGrammar:
 
     @staticmethod
     def _terminal_node(label: str, token: "ParseToken", role: str = "head") -> XBarNode:
+        """Create a terminal X-bar node for a single token."""
+
         return XBarNode(label, head=token.text, role=role, token=token.to_obj())
 
     @staticmethod
@@ -258,6 +280,8 @@ class HakkaXBarGrammar:
         pos_set: set,
         max_distance: int = 6,
     ) -> Optional[int]:
+        """Find the nearest matching token index to the left."""
+
         for distance, cursor in enumerate(range(index - 1, -1, -1), start=1):
             if distance > max_distance:
                 break
@@ -272,6 +296,8 @@ class HakkaXBarGrammar:
         pos_set: set,
         max_distance: int = 6,
     ) -> Optional[int]:
+        """Find the nearest matching token index to the right."""
+
         for distance, cursor in enumerate(range(index + 1, len(tokens)), start=1):
             if distance > max_distance:
                 break

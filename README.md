@@ -48,6 +48,17 @@ python HakkaDoctor_app.py
 
 The Gradio app supports Mandarin doctor text/audio to Hakka patient instructions and Hakka patient text/audio to Mandarin clinical meaning. Text interpretation works without loading ASR/TTS models; audio and speech synthesis load models lazily when those buttons are used.
 
+##### App Function Reference
+
+* `build_demo()`: Builds the Gradio interface for Mandarin-Hakka text/audio workflows.
+* `interpret_doctor_text(text)`: Converts Mandarin doctor text into Hakka text, romanization, candidate matches, and optional spoken audio.
+* `interpret_doctor_audio(audio_path)`: Transcribes Mandarin doctor audio before running doctor-to-patient interpretation.
+* `interpret_patient_text(text)`: Converts Hakka patient text into Mandarin clinical meaning and candidate matches.
+* `interpret_patient_audio(audio_path)`: Transcribes Hakka patient audio before running patient-to-doctor interpretation.
+* `transcribe_mandarin(audio_path)`: Runs Mandarin ASR for doctor audio.
+* `transcribe_hakka(audio_path)`: Runs Hakka ASR and returns transcription plus confidence.
+* `synthesize_hakka(romanization)`: Generates Hakka speech from romanized Hakka when TTS is available.
+
 #### Small-Data Hakka Parser
 
 ```python
@@ -105,6 +116,39 @@ Key references:
 * Chomsky, N. (1970). Remarks on nominalization. In R. Jacobs & P. Rosenbaum (Eds.), *Readings in English Transformational Grammar*.
 * Jackendoff, R. (1977). *X-bar Syntax: A Study of Phrase Structure*. MIT Press.
 * de Marneffe, M.-C., Manning, C. D., Nivre, J., & Zeman, D. (2021). Universal Dependencies. *Computational Linguistics*, 47(2), 255-308. https://doi.org/10.1162/coli_a_00402
+
+##### Parser Function Reference
+
+* `HakkaRuleParser.parse(...)`: Runs the offline MaxMatch, POS-shift, X-bar, and dependency parser.
+* `HakkaRuleParser.from_user_defined_file(path)`: Creates an offline parser from an Articut-style user dictionary file.
+* `HakkaParser.parse(...)`: Runs the selected parser backend: `articut`, `offline`, or `auto`.
+* `ArticutHakkaParser.parse(...)`: Delegates to Droidtown `ArticutAPI_Hakka` when installed, with optional offline fallback.
+* `build_user_defined_dict(rows, output_path=None)`: Converts small labeled vocabulary rows into an Articut-style dictionary.
+* `normalize_user_defined_dict(user_defined_dict)`: Accepts POS-to-word lists or word-to-POS mappings and normalizes them.
+* `load_user_defined_dict(path)`: Loads an Articut-style dictionary JSON file.
+* `apply_pos_shift_rules(pos_xml)`: Applies regex grammar repair rules to Articut-like POS XML.
+
+##### Speech Toolkit Function Reference
+
+* `HakkaSTT.transcribe(audio_path, dialect=...)`: Transcribes Hakka audio with the configured ASR model.
+* `HakkaTTS.synthesize(text, output_path)`: Synthesizes Hakka speech and saves it to a waveform file.
+* `AccentEvaluator.extract_features(audio_path)`: Extracts F0/formant summary features and tone-shape metadata.
+  It now also returns `mfcc` summaries and `hht` signal-dissection summaries.
+* `AccentEvaluator.compute_acoustic_distance(reference_audio, target_audio)`: Computes DTW-based F0 accent distance.
+* `AccentEvaluator.normalize_f0(f0, method=...)`: Normalizes F0 contours using semitone, z-score, or log-z-score methods.
+* `AccentEvaluator.summarize_tone_shape(f0)`: Summarizes tone contour start, end, range, slope, and turning points.
+* `AccentEvaluator.extract_mfcc_features(waveform, sample_rate)`: Extracts 13-coefficient MFCC, delta, and delta-delta summary statistics with `librosa`.
+* `AccentEvaluator.extract_hht_features(waveform, sample_rate)`: Extracts HHT/HHSA IMF, Hilbert spectrum, energy, entropy, and dominant carrier summaries. If `HHSA-Py` is not installed, it returns a NumPy FFT Hilbert fallback and marks the backend clearly.
+* `HakkaAccentConverter.extract_content_tokens(source_audio_path)`: Extracts HuBERT content embeddings for conversion experiments.
+* `HakkaAccentConverter.convert_accent(source_audio_path, target_speaker_embedding, output_path)`: Runs conversion through a supplied Soft-VC/VITS decoder.
+
+For full EMD/HHT signal dissection, install HHSA-Py separately:
+
+```bash
+python3 -m pip install git+https://github.com/DHCLAIRE/HHSA-Py.git
+```
+
+The HHT feature path follows the accent-classification motivation in Walsh, Dev, and Nag (2022): use Hilbert-Huang features for non-linear, non-stationary speech where Fourier/Mel features can lose temporal-frequency detail. MFCC remains available as the conventional baseline.
 
 #### Accent Evaluation
 

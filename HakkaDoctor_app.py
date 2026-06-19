@@ -18,6 +18,8 @@ from hakka_speech_toolkit.interpretation import (
 
 
 def _device_config() -> tuple[str, Any]:
+    """Return the best available torch device and dtype for model inference."""
+
     import torch
 
     if torch.cuda.is_available():
@@ -29,6 +31,8 @@ def _device_config() -> tuple[str, Any]:
 
 @lru_cache(maxsize=1)
 def get_mandarin_asr():
+    """Load and cache the Mandarin Whisper ASR pipeline."""
+
     from transformers import pipeline
 
     device, dtype = _device_config()
@@ -42,6 +46,8 @@ def get_mandarin_asr():
 
 @lru_cache(maxsize=1)
 def get_hakka_asr():
+    """Load and cache the Hakka Whisper processor/model tuple."""
+
     import torch
     from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
 
@@ -60,6 +66,8 @@ def get_hakka_asr():
 
 @lru_cache(maxsize=1)
 def get_hakka_tts():
+    """Load and cache the Hakka MMS TTS tokenizer/model tuple."""
+
     import torch
     from transformers import AutoTokenizer, VitsModel
 
@@ -72,6 +80,8 @@ def get_hakka_tts():
 
 
 def synthesize_hakka(romanization: str):
+    """Generate Hakka speech audio from romanized Hakka text when TTS is available."""
+
     if not romanization:
         return None
     try:
@@ -85,6 +95,8 @@ def synthesize_hakka(romanization: str):
 
 
 def transcribe_mandarin(audio_path: str | None) -> str:
+    """Transcribe Mandarin audio into text using the cached ASR pipeline."""
+
     if not audio_path:
         return ""
     result = get_mandarin_asr()(
@@ -95,6 +107,8 @@ def transcribe_mandarin(audio_path: str | None) -> str:
 
 
 def transcribe_hakka(audio_path: str | None) -> tuple[str, str]:
+    """Transcribe Hakka audio and return text plus an approximate confidence string."""
+
     if not audio_path:
         return "", "0.0%"
 
@@ -124,6 +138,8 @@ def transcribe_hakka(audio_path: str | None) -> tuple[str, str]:
 
 
 def interpret_doctor_text(text: str):
+    """Interpret Mandarin doctor text into Hakka text, romanization, candidates, and audio."""
+
     result = interpret_text(text, direction="mandarin_to_hakka")
     matches = result["matches"]
     best = result["best_match"] or {}
@@ -138,11 +154,15 @@ def interpret_doctor_text(text: str):
 
 
 def interpret_doctor_audio(audio_path: str | None):
+    """Transcribe Mandarin doctor audio and interpret it for the patient."""
+
     text = transcribe_mandarin(audio_path)
     return interpret_doctor_text(text)
 
 
 def interpret_patient_text(text: str):
+    """Interpret Hakka patient text into Mandarin clinical meaning and candidates."""
+
     result = interpret_text(text, direction="hakka_to_mandarin")
     matches = result["matches"]
     best = result["best_match"] or {}
@@ -154,12 +174,16 @@ def interpret_patient_text(text: str):
 
 
 def interpret_patient_audio(audio_path: str | None):
+    """Transcribe Hakka patient audio and interpret it for the doctor."""
+
     text, confidence = transcribe_hakka(audio_path)
     summary, mandarin, table = interpret_patient_text(text)
     return f"{summary}\nASR confidence: {confidence}", mandarin, confidence, table
 
 
 def build_demo() -> gr.Blocks:
+    """Build the Gradio interface for text and audio interpretation workflows."""
+
     match_headers = ["Score", "Urgency", "Category", "Intent", "Mandarin", "Hakka", "Keywords"]
 
     with gr.Blocks(title="Hakka Doctor Medical Interpreter") as demo:

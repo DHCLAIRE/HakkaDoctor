@@ -15,6 +15,8 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    """Lazily import optional toolkit components only when requested."""
+
     if name == "AccentEvaluator":
         from .accent import AccentEvaluator
 

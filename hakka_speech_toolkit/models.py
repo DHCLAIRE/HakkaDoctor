@@ -16,6 +16,8 @@ class HakkaSpeechModel:
     """Base class that centralizes device and precision selection."""
 
     def __init__(self, device: str | torch.device | None = None) -> None:
+        """Select CUDA when available unless the caller provides a device."""
+
         self.device = torch.device(
             device if device is not None else ("cuda" if torch.cuda.is_available() else "cpu")
         )
@@ -23,6 +25,8 @@ class HakkaSpeechModel:
 
     @staticmethod
     def _require_file(audio_path: str | Path) -> Path:
+        """Validate and return an existing audio file path."""
+
         path = Path(audio_path).expanduser()
         if not path.exists():
             raise FileNotFoundError(f"Audio file not found: {path}")
@@ -32,6 +36,8 @@ class HakkaSpeechModel:
 
     @staticmethod
     def _handle_oom(error: RuntimeError) -> None:
+        """Convert CUDA out-of-memory errors into a clearer toolkit exception."""
+
         if "out of memory" in str(error).lower():
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -51,6 +57,8 @@ class HakkaSTT(HakkaSpeechModel):
         device: str | torch.device | None = None,
         **pipeline_kwargs: Any,
     ) -> None:
+        """Load the Hakka Whisper ASR model and processor."""
+
         super().__init__(device=device)
 
         try:
@@ -119,6 +127,8 @@ class HakkaTTS(HakkaSpeechModel):
         device: str | torch.device | None = None,
         **pipeline_kwargs: Any,
     ) -> None:
+        """Load the Hakka text-to-speech pipeline."""
+
         super().__init__(device=device)
 
         try:
