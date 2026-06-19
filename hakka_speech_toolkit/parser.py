@@ -166,6 +166,9 @@ class HakkaRuleParser:
     ) -> None:
         self.max_oov_group = max_oov_group
         self.lexicon = self._build_lexicon(user_defined_dict or {})
+        from .parser_grammar import HakkaXBarGrammar
+
+        self.grammar = HakkaXBarGrammar()
 
     @classmethod
     def from_user_defined_file(cls, user_defined_dict_file: str | Path) -> "HakkaRuleParser":
@@ -196,6 +199,7 @@ class HakkaRuleParser:
         shifted_pos_xml, regex_rules = apply_pos_shift_rules(pos_xml)
         tokens = self._tokens_from_pos_xml(shifted_pos_xml, first_pass_tokens)
         spans = self._infer_sentence_spans(tokens)
+        grammar_result = self.grammar.analyze(tokens)
 
         result_pos = [token.to_pos_xml() for token in tokens if token.pos != "PUNCTUATION"]
         result_segmentation = "╱".join(token.text for token in tokens if token.text.strip())
@@ -211,6 +215,11 @@ class HakkaRuleParser:
             "result_obj": result_obj,
             "tokens": [token.to_obj() for token in tokens if token.text.strip()],
             "sentence_patterns": spans,
+            "xbar_tree": grammar_result["xbar_tree"],
+            "dependencies": grammar_result["dependencies"],
+            "grammar_rules_applied": grammar_result["grammar_rules_applied"],
+            "annotation_framework": grammar_result["annotation_framework"],
+            "grammar_references": grammar_result["grammar_references"],
             "rules_applied": rules_applied,
             "lexicon_sources": {
                 "default": "Small seed lexicon modeled after Articut POS categories.",
@@ -224,6 +233,7 @@ class HakkaRuleParser:
                 "user_defined_dictionary_merge",
                 "token_context_heuristics",
                 "regex_pos_shift",
+                "xbar_dependency_rules",
                 "small_data_oov_heuristics",
             ],
         }

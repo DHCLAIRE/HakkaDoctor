@@ -61,6 +61,21 @@ print(result["result_pos"])
 
 The parser follows the low-resource, ArticutAPI_Hakka-style approach without requiring the paid Mandarin Articut API at runtime. It uses layered POS dictionaries, forward maximum matching, user-defined dictionary injection, token-context heuristics, regex `posShift` repairs over Articut-like POS XML, and OOV heuristics. This repository does not redistribute Droidtown's `HAC_dict` or `IreneHAKKA_dict`; check that project's license before reusing their vocabulary lists directly.
 
+To use Droidtown's actual parser instead of the offline fallback, install `ArticutAPI_Hakka` separately and pass your Articut credentials:
+
+```python
+from hakka_speech_toolkit import HakkaParser
+
+parser = HakkaParser(
+    backend="articut",
+    username="YOUR_EMAIL",
+    apikey="YOUR_API_KEY",
+)
+result = parser.parse("𠊎毋食藥。", userDefinedDictFILE="hakka_rules.json")
+```
+
+Use `backend="auto"` to try ArticutAPI_Hakka first and fall back to the local rule parser if the external package is unavailable.
+
 ```python
 from hakka_speech_toolkit.parser import build_user_defined_dict
 
@@ -75,6 +90,21 @@ result = parser.parse("請量血氧", userDefinedDictFILE="hakka_rules.json")
 Returned fields include `result_segmentation`, `result_pos`, `result_obj`, `tokens`, `sentence_patterns`, and `rules_applied`, so the output can be used in downstream clinical interpretation or annotation workflows.
 
 For tiny datasets, start by converting reviewed rows into the user-defined dictionary format, then add systematic grammar repairs to `hakka_speech_toolkit/parser_rules.py`. This mirrors ArticutAPI_Hakka's practical split between curated POS vocabulary and regex correction rules.
+
+The syntax layer adds an X-bar-inspired phrase projection and UD-compatible dependency baseline. Treat this as a grammar-writing workflow, not a trained parser:
+
+1. **Stage 0 - Corpus triage:** record corpus size, register, Hakka variety, script/romanization, and whether the data is segmented.
+2. **Stage 1 - Lexicon and segmenter:** build curated POS lexicons for your target variety, using sources such as Taiwan MOE's 客家語常用詞辭典 when appropriate.
+3. **Stage 2 - Hand annotation:** annotate 100-300 representative sentences in a UD-compatible format before claiming syntactic coverage.
+4. **Stage 3 - Grammar rules:** encode X-bar/dependency rules for verb-argument structure, classifier-noun phrases, negation/aspect scope, possessives, and clause-final particles.
+
+Parser output now includes `xbar_tree`, `dependencies`, `grammar_rules_applied`, `annotation_framework`, and `grammar_references`. The implementation cites Chomsky's X-bar origin, Jackendoff's phrase-structure development, and Universal Dependencies for dependency labels.
+
+Key references:
+
+* Chomsky, N. (1970). Remarks on nominalization. In R. Jacobs & P. Rosenbaum (Eds.), *Readings in English Transformational Grammar*.
+* Jackendoff, R. (1977). *X-bar Syntax: A Study of Phrase Structure*. MIT Press.
+* de Marneffe, M.-C., Manning, C. D., Nivre, J., & Zeman, D. (2021). Universal Dependencies. *Computational Linguistics*, 47(2), 255-308. https://doi.org/10.1162/coli_a_00402
 
 #### Accent Evaluation
 

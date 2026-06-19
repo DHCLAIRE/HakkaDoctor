@@ -9,3 +9,5 @@ soundfile
 torch
 torchaudio
 transformers
+# Optional Hakka parser backend:
+# ArticutAPI_Hakka must be installed separately from Droidtown's repository.

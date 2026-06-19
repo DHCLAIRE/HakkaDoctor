@@ -9,6 +9,8 @@ __all__ = [
     "HakkaRuleParser",
     "ArticutLikeHakkaParser",
     "build_user_defined_dict",
+    "ArticutHakkaParser",
+    "HakkaParser",
 ]
 
 
@@ -36,5 +38,12 @@ def __getattr__(name: str):
             "HakkaRuleParser": HakkaRuleParser,
             "ArticutLikeHakkaParser": ArticutLikeHakkaParser,
             "build_user_defined_dict": build_user_defined_dict,
+        }[name]
+    if name in {"ArticutHakkaParser", "HakkaParser"}:
+        from .articut_adapter import ArticutHakkaParser, HakkaParser
+
+        return {
+            "ArticutHakkaParser": ArticutHakkaParser,
+            "HakkaParser": HakkaParser,
         }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
