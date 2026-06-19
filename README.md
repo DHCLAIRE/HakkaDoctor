@@ -59,7 +59,7 @@ print(result["result_segmentation"])
 print(result["result_pos"])
 ```
 
-The parser follows the low-resource, Articut-style approach: layered POS dictionaries, forward maximum matching, user-defined dictionary injection, post-token POS shift rules, and OOV heuristics. It accepts Articut-shaped user dictionaries:
+The parser follows the low-resource, ArticutAPI_Hakka-style approach without requiring the paid Mandarin Articut API at runtime. It uses layered POS dictionaries, forward maximum matching, user-defined dictionary injection, token-context heuristics, regex `posShift` repairs over Articut-like POS XML, and OOV heuristics. This repository does not redistribute Droidtown's `HAC_dict` or `IreneHAKKA_dict`; check that project's license before reusing their vocabulary lists directly.
 
 ```python
 from hakka_speech_toolkit.parser import build_user_defined_dict
@@ -73,6 +73,8 @@ result = parser.parse("請量血氧", userDefinedDictFILE="hakka_rules.json")
 ```
 
 Returned fields include `result_segmentation`, `result_pos`, `result_obj`, `tokens`, `sentence_patterns`, and `rules_applied`, so the output can be used in downstream clinical interpretation or annotation workflows.
+
+For tiny datasets, start by converting reviewed rows into the user-defined dictionary format, then add systematic grammar repairs to `hakka_speech_toolkit/parser_rules.py`. This mirrors ArticutAPI_Hakka's practical split between curated POS vocabulary and regex correction rules.
 
 #### Accent Evaluation
 

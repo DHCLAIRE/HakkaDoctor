@@ -6,6 +6,7 @@ from hakka_speech_toolkit.parser import (
     build_user_defined_dict,
     normalize_user_defined_dict,
 )
+from hakka_speech_toolkit.parser_rules import apply_pos_shift_rules
 
 
 def test_parser_segments_and_tags_known_hakka_sentence():
@@ -55,3 +56,14 @@ def test_possessive_particle_rule():
     token_map = {token["text"]: token["pos"] for token in result["tokens"]}
 
     assert token_map["介"] == "ENTITY_possessive"
+
+
+def test_regex_pos_shift_repairs_articut_style_xml():
+    shifted, applied = apply_pos_shift_rules(
+        "<ENTITY_pronoun>𠊎</ENTITY_pronoun>"
+        "<FUNC_inner>个</FUNC_inner>"
+        "<ENTITY_noun>藥</ENTITY_noun>"
+    )
+
+    assert "<ENTITY_possessive>个</ENTITY_possessive>" in shifted
+    assert "pronoun_before_possessive_particle" in applied

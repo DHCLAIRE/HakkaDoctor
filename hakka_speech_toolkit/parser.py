@@ -14,6 +14,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import json
 import re
 
+from .parser_rules import apply_pos_shift_rules
+
 
 ARTICUT_COMPATIBLE_POS = (
     "ACTION_verb",
@@ -189,12 +191,16 @@ class HakkaRuleParser:
 
         lexicon = self.lexicon if not runtime_dict else self._build_lexicon(runtime_dict, base=self.lexicon)
         tokens = self._tokenize(input_text, lexicon)
-        tokens, rules_applied = self._apply_pos_shift_rules(tokens)
+        first_pass_tokens, heuristic_rules = self._apply_context_heuristics(tokens)
+        pos_xml = "".join(token.to_pos_xml() for token in first_pass_tokens if token.pos != "PUNCTUATION")
+        shifted_pos_xml, regex_rules = apply_pos_shift_rules(pos_xml)
+        tokens = self._tokens_from_pos_xml(shifted_pos_xml, first_pass_tokens)
         spans = self._infer_sentence_spans(tokens)
 
         result_pos = [token.to_pos_xml() for token in tokens if token.pos != "PUNCTUATION"]
         result_segmentation = "╱".join(token.text for token in tokens if token.text.strip())
         result_obj = [[token.to_obj() for token in tokens if token.text.strip()]]
+        rules_applied = heuristic_rules + regex_rules
         result = {
             "status": True,
             "msg": "Success!",
@@ -206,12 +212,18 @@ class HakkaRuleParser:
             "tokens": [token.to_obj() for token in tokens if token.text.strip()],
             "sentence_patterns": spans,
             "rules_applied": rules_applied,
+            "lexicon_sources": {
+                "default": "Small seed lexicon modeled after Articut POS categories.",
+                "user_defined": "Caller-provided domain or dataset vocabulary.",
+                "pos_shift": "Regex grammar repairs applied after first-pass tagging.",
+            },
             "parser": "HakkaRuleParser",
             "parser_strategy": [
                 "forward_maximum_matching",
                 "articut_style_pos_dictionary",
                 "user_defined_dictionary_merge",
-                "post_token_pos_shift",
+                "token_context_heuristics",
+                "regex_pos_shift",
                 "small_data_oov_heuristics",
             ],
         }
@@ -342,7 +354,7 @@ class HakkaRuleParser:
                 return ParseToken(char, pos, index, index + 1, lexicon[pos][char])
         return ParseToken(char, "ENTITY_oov", index, index + 1, "oov")
 
-    def _apply_pos_shift_rules(self, tokens: List[ParseToken]) -> Tuple[List[ParseToken], List[str]]:
+    def _apply_context_heuristics(self, tokens: List[ParseToken]) -> Tuple[List[ParseToken], List[str]]:
         shifted = list(tokens)
         rules_applied: List[str] = []
 
@@ -374,7 +386,33 @@ class HakkaRuleParser:
                 shifted[index] = self._replace_pos(token, "ENTITY_noun")
                 rules_applied.append("classifier_marks_oov_noun")
 
-        return self._merge_adjacent_compounds(shifted, rules_applied), rules_applied
+        return shifted, rules_applied
+
+    @staticmethod
+    def _tokens_from_pos_xml(pos_xml: str, fallback_tokens: Sequence[ParseToken]) -> List[ParseToken]:
+        parsed = [
+            ParseToken(match.group("text"), match.group("pos"), 0, 0, "pos_shift")
+            for match in re.finditer(r"<(?P<pos>[^>]+)>(?P<text>[^<]+)</(?P=pos)>", pos_xml)
+        ]
+        if not parsed:
+            return list(fallback_tokens)
+
+        source_by_text: Dict[str, str] = {}
+        cursor_by_text: Dict[str, int] = {}
+        for token in fallback_tokens:
+            source_by_text.setdefault(token.text, token.source)
+            cursor_by_text.setdefault(token.text, token.start)
+
+        rebuilt = []
+        search_start = 0
+        for token in parsed:
+            start = cursor_by_text.get(token.text)
+            if start is None or start < search_start:
+                start = search_start
+            end = start + len(token.text)
+            rebuilt.append(ParseToken(token.text, token.pos, start, end, source_by_text.get(token.text, token.source)))
+            search_start = end
+        return rebuilt
 
     @staticmethod
     def _replace_pos(token: ParseToken, pos: str) -> ParseToken:
@@ -393,33 +431,6 @@ class HakkaRuleParser:
             if tokens[cursor].pos != "PUNCTUATION":
                 return tokens[cursor]
         return None
-
-    def _merge_adjacent_compounds(
-        self,
-        tokens: List[ParseToken],
-        rules_applied: List[str],
-    ) -> List[ParseToken]:
-        merged: List[ParseToken] = []
-        index = 0
-        while index < len(tokens):
-            token = tokens[index]
-            nxt = tokens[index + 1] if index + 1 < len(tokens) else None
-            if nxt and token.pos == nxt.pos and token.pos in ("ACTION_verb", "ENTITY_noun", "MODIFIER"):
-                merged.append(
-                    ParseToken(
-                        token.text + nxt.text,
-                        token.pos,
-                        token.start,
-                        nxt.end,
-                        token.source if token.source == nxt.source else "merged",
-                    )
-                )
-                rules_applied.append("merge_adjacent_{}".format(token.pos))
-                index += 2
-            else:
-                merged.append(token)
-                index += 1
-        return merged
 
     def _infer_sentence_spans(self, tokens: Sequence[ParseToken]) -> List[Dict[str, Any]]:
         patterns = []
