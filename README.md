@@ -48,6 +48,11 @@ python HakkaDoctor_app.py
 
 The Gradio app supports Mandarin doctor text/audio to Hakka patient instructions and Hakka patient text/audio to Mandarin clinical meaning. Text interpretation works without loading ASR/TTS models; audio and speech synthesis load models lazily when those buttons are used.
 
+### Documentation
+
+* [Tutorials for app users and coders](docs/tutorials.md): run the app, try text/audio interpretation, add clinical phrases, customize parser vocabulary, and build small scripts.
+* [API reference](docs/api.md): public app helpers, interpretation functions, parser classes, speech model wrappers, accent analysis, accent conversion, and common return fields.
+
 ##### App Function Reference
 
 * `build_demo()`: Builds the Gradio interface for Mandarin-Hakka text/audio workflows.
